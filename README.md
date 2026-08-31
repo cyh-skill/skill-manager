@@ -83,18 +83,18 @@ open ".build/release-app/Skill Manager.app"
 
 ## GitHub CI 与发布
 
-推送到 `main` 后，GitHub Actions 会在带 Swift 6 的 Apple Silicon `macos-15` runner 上运行测试、构建并校验 DMG，DMG 可从该次 CI 的 Artifact 下载。推送与 `Resources/Info.plist` 版本一致的标签后（例如 `v0.1.0`），Release 工作流会自动创建 GitHub Release 并上传 DMG 与 SHA-256 文件：
+推送到 `main` 后，GitHub Actions 会在带 Swift 6 的 Apple Silicon `macos-15` runner 上运行测试、构建、独立启动应用并校验 DMG，DMG 可从该次 CI 的 Artifact 下载。推送与 `Resources/Info.plist` 版本一致的标签后（例如 `v0.1.1`），Release 工作流会自动创建 GitHub Release 并上传 DMG 与 SHA-256 文件：
 
 ```bash
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 通过 GitHub CLI 下载并安装 Release：
 
 ```bash
-gh release download v0.1.0 -p '*.dmg' -D /tmp/skill-manager-release
-open /tmp/skill-manager-release/Skill-Manager-0.1.0.dmg
+gh release download v0.1.1 -p '*.dmg' -D /tmp/skill-manager-release
+open /tmp/skill-manager-release/Skill-Manager-0.1.1.dmg
 ```
 
 发布包目前使用 ad-hoc 签名且未做 Apple notarization，首次从浏览器下载后 macOS 可能要求在“隐私与安全性”中确认打开；应用不会修改或删除 `~/.skill-manager` 中的用户数据。

@@ -523,7 +523,7 @@ final class AppModel {
     }
 
     private static func loadBundledRouter() -> String {
-        let candidates = [Bundle.main.resourceURL, Bundle.module.resourceURL]
+        let candidates = [Bundle.main.resourceURL]
             .compactMap { $0?.appendingPathComponent("skill-router/SKILL.md") }
         for url in candidates {
             if let content = try? String(contentsOf: url, encoding: .utf8) {

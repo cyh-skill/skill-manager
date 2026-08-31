@@ -26,6 +26,9 @@ jobs:
       - name: Build DMG
         run: ./scripts/build-dmg.sh
 
+      - name: Smoke test standalone app
+        run: ./scripts/smoke-test-app.sh
+
       - name: Verify app and disk image
         run: |
           codesign --verify --deep --strict ".build/release-app/Skill Manager.app"

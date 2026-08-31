@@ -33,4 +33,8 @@ done
 chmod 755 "$app_dir/Contents/MacOS/SkillManager" "$app_dir/Contents/Resources/skill-manager-cli"
 codesign --force --deep --sign - "$app_dir"
 
+test -f "$app_dir/Contents/Resources/skill-router/SKILL.md"
+test -f "$app_dir/Contents/Resources/zh-Hans.lproj/Localizable.strings"
+test -f "$app_dir/Contents/Resources/en.lproj/Localizable.strings"
+
 echo "$app_dir"

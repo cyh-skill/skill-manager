@@ -20,10 +20,7 @@ let package = Package(
         .executableTarget(
             name: "SkillManagerApp",
             dependencies: ["SkillManagerCore"],
-            resources: [
-                .process("Resources/Localization"),
-                .copy("Resources/skill-router")
-            ]
+            exclude: ["Resources"]
         ),
         .executableTarget(
             name: "SkillManagerCLI",
