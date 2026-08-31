@@ -7,11 +7,26 @@ private enum AppWindowID {
 
 private enum MenuBarIcon {
     static let image: NSImage = {
+        let canvasSize = NSSize(width: 18, height: 18)
+        let glyphSize = NSSize(width: 20, height: 20)
         let configuration = NSImage.SymbolConfiguration(pointSize: 16, weight: .semibold)
-        let image = NSImage(
+        guard let symbol = NSImage(
             systemSymbolName: "s.circle.fill",
             accessibilityDescription: "Skill Manager"
-        )?.withSymbolConfiguration(configuration) ?? NSImage()
+        )?.withSymbolConfiguration(configuration) else {
+            return NSImage(size: canvasSize)
+        }
+
+        let image = NSImage(size: canvasSize, flipped: false) { bounds in
+            let destination = NSRect(
+                x: (bounds.width - glyphSize.width) / 2,
+                y: (bounds.height - glyphSize.height) / 2,
+                width: glyphSize.width,
+                height: glyphSize.height
+            )
+            symbol.draw(in: destination, from: .zero, operation: .sourceOver, fraction: 1)
+            return true
+        }
         image.isTemplate = true
         return image
     }()
