@@ -83,7 +83,7 @@ open ".build/release-app/Skill Manager.app"
 
 ## GitHub CI 与发布
 
-推送到 `main` 后，GitHub Actions 会在 Apple Silicon `macos-14` runner 上运行测试、构建并校验 DMG，DMG 可从该次 CI 的 Artifact 下载。推送与 `Resources/Info.plist` 版本一致的标签后（例如 `v0.1.0`），Release 工作流会自动创建 GitHub Release 并上传 DMG 与 SHA-256 文件：
+推送到 `main` 后，GitHub Actions 会在带 Swift 6 的 Apple Silicon `macos-15` runner 上运行测试、构建并校验 DMG，DMG 可从该次 CI 的 Artifact 下载。推送与 `Resources/Info.plist` 版本一致的标签后（例如 `v0.1.0`），Release 工作流会自动创建 GitHub Release 并上传 DMG 与 SHA-256 文件：
 
 ```bash
 git tag v0.1.0
