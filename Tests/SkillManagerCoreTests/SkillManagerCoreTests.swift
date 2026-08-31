@@ -292,6 +292,22 @@ final class SkillManagerServiceTests: XCTestCase {
         XCTAssertEqual(try service.store.load().skills[0].mode, .lazy)
     }
 
+    func testBootstrapNeverReplacesExistingRouterContent() throws {
+        let customized = Self.routerContent + "\nKeep this user rule.\n"
+        try service.saveRouterContent(customized)
+
+        try service.bootstrap(defaultRouterContent: """
+        ---
+        name: skill-router
+        description: A different bundled default.
+        ---
+
+        Do something different.
+        """)
+
+        XCTAssertEqual(try service.routerContent(), customized)
+    }
+
     func testForceManagedLinkMovesConflictingEntryToRecoverableTrash() throws {
         let forcedTrash = sandbox.appendingPathComponent("forced-trash", isDirectory: true)
         let forcedService = SkillManagerService(paths: paths) { source in
