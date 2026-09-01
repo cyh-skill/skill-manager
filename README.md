@@ -29,6 +29,8 @@ Lazy 模式把这些低频 Skill 保存在 `~/.skill-manager/sources` 冷库中�
 
 从 GitHub 导入时会弹出加载方式选择；选择 Lazy 后，仓库中的有效 Skill 只进入冷库，选择托管直装后，则统一链接到当前支持的 Codex 与 Claude Code Skill 目录。后续可以在“全部 Skills”或“CLI 管理”中查看和调整状态。
 
+Disabled 是独立于加载方式的停用状态。停用后，Skill 仍保留在 GitHub 冷库中并可以继续检测更新，但它会从 Lazy Router 搜索结果中排除，Codex 与 Claude Code 中已有的托管链接也会移除；列表卡片会灰显并进入 Disabled 分组。重新启用时会恢复停用前的 Lazy 或托管直装配置及原 CLI 目标。
+
 ## Lazy Router 如何工作
 
 Skill Manager 内置并管理一个可编辑的 `skill-router`。Router 通过 companion CLI 查询 catalog：
@@ -47,16 +49,23 @@ Skill Manager 内置并管理一个可编辑的 `skill-router`。Router 通过 c
 - 从明确的 GitHub URL 导入仓库中的全部有效 `SKILL.md`，并在弹窗中选择 Lazy 或托管直装
 - 进入 Skill 库并输入搜索词后并行查询 skills.sh 与 GitHub，两路结果都只通过已认证的 `gh` 从 GitHub 安装
 - 扫描 Codex `~/.agents/skills`、旧版 `~/.codex/skills` 与 Claude Code `~/.claude/skills`
-- 首次启动迁移向导：每个历史 Skill 必须进入主 Skill 或 Router
+- 首次启动迁移向导：迁移时每个历史 Skill 必须进入主 Skill 或 Router；向导可随时关闭并稍后重开
 - 迁移前自动备份；整批任意一步失败时恢复原目录，避免半迁移状态
+- 在“全部 Skills”中逐条管理历史未托管入口，可将指定 CLI 中的单个入口安全移到 macOS 废纸篓
 - 使用 GitHub 中央工作副本和受控软链接，不在多个 CLI 目录维护重复副本
+- 对比 catalog 期望状态与磁盘实际状态，并可用“同步托管状态”一键重建缺失链接、修复错误链接或移除多余的受管链接；手工安装的其他 Skill 不受影响
 - 检测 GitHub 更新；出现“有更新”时可点击徽标直接更新对应仓库
+- 使用 Disabled 分组集中查看停用项；停用项不进入 Router，也不会加载到 Codex 或 Claude Code
 - 编辑内置 Router、查看 CLI 加载状态和操作记录
 - 复用现有 `gh auth` 登录态，不额外保存 GitHub Token
 
 ## 初始化迁移
 
 第一次启动时，应用会扫描已有 Skill，合并指向同一实际目录的安装入口，并要求为每一项选择“进入主 Skill”或“进入 Router”。进入任一托管模式前，原入口都会移动到带时间戳的可恢复备份；GitHub 工作副本随后成为版本权威。
+
+迁移向导不是强制阻塞窗口：可以点击右上角关闭按钮或按 `Esc` 暂时跳过，未处理项目仍会保留为“历史未托管”。之后可从“全部 Skills”中的“打开迁移向导”，或“设置”中的“重新运行迁移向导”继续处理，关闭向导不会执行迁移，也不会把初始化标记为完成。
+
+如果某个历史入口已经不再需要，可在“全部 Skills”的“历史未托管”区域点击对应的废纸篓按钮。应用会先显示确认框，再将所选 Codex 或 Claude Code 入口移动到 macOS 废纸篓；这不会删除 Skill Manager 的 GitHub 冷库，也不会影响同一 Skill 在另一个 CLI 中的入口，误删后仍可从废纸篓恢复。
 
 没有 GitHub 来源的本地 Skill 必须先指定一个现有 GitHub 仓库。Skill Manager 不会擅自创建仓库或上传本地文件；如果本地工作副本包含未提交修改，原内容仍会完整保存在迁移备份中。
 

@@ -73,14 +73,23 @@ struct MetricCard: View {
 
 struct ModeBadge: View {
     var mode: InstallMode
+    var isDisabled = false
+
+    private var color: Color {
+        if isDisabled { return .gray }
+        return mode == .lazy ? .indigo : .green
+    }
 
     var body: some View {
-        Label(L10n.string(mode.displayName), systemImage: mode == .lazy ? "moon.stars" : "link")
+        Label(
+            isDisabled ? L10n.string("已停用") : L10n.string(mode.displayName),
+            systemImage: isDisabled ? "pause.circle" : (mode == .lazy ? "moon.stars" : "link")
+        )
             .font(.caption.weight(.medium))
-            .foregroundStyle(mode == .lazy ? Color.indigo : Color.green)
+            .foregroundStyle(color)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background((mode == .lazy ? Color.indigo : Color.green).opacity(0.11), in: Capsule())
+            .background(color.opacity(0.11), in: Capsule())
     }
 }
 

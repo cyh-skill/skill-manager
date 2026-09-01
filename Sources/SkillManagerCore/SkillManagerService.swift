@@ -2,6 +2,8 @@ import Foundation
 
 public enum SkillManagerServiceError: LocalizedError {
     case skillNotFound
+    case skillDisabled
+    case missingSource(String)
     case invalidRouter(String)
     case conflict(String)
     case unsafeRemoval(String)
@@ -11,6 +13,10 @@ public enum SkillManagerServiceError: LocalizedError {
         switch self {
         case .skillNotFound:
             CoreL10n.choose("找不到对应的托管 Skill。", "The managed Skill could not be found.")
+        case .skillDisabled:
+            CoreL10n.choose("该 Skill 已停用，请先重新启用。", "This Skill is disabled. Enable it first.")
+        case .missingSource(let path):
+            CoreL10n.choose("托管源码不存在或缺少 SKILL.md：\(path)", "The managed source is missing or has no SKILL.md: \(path)")
         case .invalidRouter(let detail):
             CoreL10n.choose("Router 内容无效：\(detail)", "Invalid Router content: \(detail)")
         case .conflict(let path):
@@ -24,6 +30,15 @@ public enum SkillManagerServiceError: LocalizedError {
             )
         }
     }
+}
+
+private struct ManagedLinkExpectation {
+    var managedSkillID: UUID?
+    var name: String
+    var tool: ToolID
+    var source: URL
+    var destination: URL
+    var shouldExist: Bool
 }
 
 public struct SkillManagerService: Sendable {
@@ -65,7 +80,70 @@ public struct SkillManagerService: Sendable {
         if backfillRevisionDates(in: &catalog) {
             try store.save(catalog)
         }
-        return WorkspaceSnapshot(catalog: catalog, detectedSkills: scanToolDirectories(catalog: catalog))
+        return WorkspaceSnapshot(
+            catalog: catalog,
+            detectedSkills: scanToolDirectories(catalog: catalog),
+            managedStateIssues: managedStateIssues(catalog: catalog)
+        )
+    }
+
+    public func synchronizeManagedState(force: Bool = false) throws -> ManagedStateSyncResult {
+        var catalog = try store.load()
+        let expectations = managedLinkExpectations(catalog: catalog)
+
+        for expectation in expectations where expectation.shouldExist {
+            let skillFile = expectation.source.appendingPathComponent("SKILL.md")
+            guard FileManager.default.fileExists(atPath: skillFile.path) else {
+                throw SkillManagerServiceError.missingSource(expectation.source.path)
+            }
+            if fileExistsIncludingSymlink(expectation.destination),
+               !managedLinkMatches(destination: expectation.destination, source: expectation.source),
+               !force {
+                throw SkillManagerServiceError.conflict(expectation.destination.path)
+            }
+        }
+
+        var result = ManagedStateSyncResult()
+        for expectation in expectations {
+            if expectation.shouldExist {
+                if managedLinkMatches(destination: expectation.destination, source: expectation.source) {
+                    result.unchangedLinks += 1
+                    continue
+                }
+                let existed = fileExistsIncludingSymlink(expectation.destination)
+                try createManagedLink(
+                    source: expectation.source,
+                    destination: expectation.destination,
+                    force: force
+                )
+                if existed {
+                    result.repairedLinks += 1
+                } else {
+                    result.createdLinks += 1
+                }
+            } else if managedLinkMatches(destination: expectation.destination, source: expectation.source) {
+                try removeManagedLink(
+                    destination: expectation.destination,
+                    expectedSource: expectation.source,
+                    force: false
+                )
+                result.removedLinks += 1
+            }
+        }
+
+        store.addingActivity(
+            ActivityEvent(
+                kind: .linked,
+                title: CoreL10n.choose("同步托管状态", "Synchronized Managed State"),
+                detail: CoreL10n.choose(
+                    "新建 \(result.createdLinks) · 修复 \(result.repairedLinks) · 移除 \(result.removedLinks) · 已一致 \(result.unchangedLinks)",
+                    "Created \(result.createdLinks) · Repaired \(result.repairedLinks) · Removed \(result.removedLinks) · Already correct \(result.unchangedLinks)"
+                )
+            ),
+            to: &catalog
+        )
+        try store.save(catalog)
+        return result
     }
 
     public func migrationCandidates() throws -> [MigrationCandidate] {
@@ -395,6 +473,9 @@ public struct SkillManagerService: Sendable {
             throw SkillManagerServiceError.skillNotFound
         }
         let skill = catalog.skills[index]
+        guard !skill.isDisabled else {
+            throw SkillManagerServiceError.skillDisabled
+        }
         let source = URL(fileURLWithPath: skill.localPath, isDirectory: true).standardizedFileURL
         guard FileManager.default.fileExists(atPath: source.appendingPathComponent("SKILL.md").path) else {
             throw SkillManagerServiceError.skillNotFound
@@ -424,6 +505,77 @@ public struct SkillManagerService: Sendable {
                     kind: .unlinked,
                     title: CoreL10n.choose("转为 Lazy：\(skill.name)", "Moved to Lazy: \(skill.name)"),
                     detail: tool.displayName
+                ),
+                to: &catalog
+            )
+        }
+        catalog.skills[index].updatedAt = Date()
+        try store.save(catalog)
+    }
+
+    public func setSkillDisabled(
+        _ skillID: UUID,
+        disabled: Bool,
+        force: Bool = false
+    ) throws {
+        var catalog = try store.load()
+        guard let index = catalog.skills.firstIndex(where: { $0.id == skillID }) else {
+            throw SkillManagerServiceError.skillNotFound
+        }
+        let skill = catalog.skills[index]
+        guard skill.isDisabled != disabled else { return }
+
+        let source = URL(fileURLWithPath: skill.localPath, isDirectory: true).standardizedFileURL
+        let destinations = Dictionary(uniqueKeysWithValues: ToolID.allCases.map { tool in
+            (tool, paths.skillsDirectory(for: tool).appendingPathComponent(skill.name, isDirectory: true))
+        })
+
+        if disabled {
+            for tool in skill.targets {
+                guard let destination = destinations[tool], fileExistsIncludingSymlink(destination) else { continue }
+                if !managedLinkMatches(destination: destination, source: source), !force {
+                    throw SkillManagerServiceError.unsafeRemoval(destination.path)
+                }
+            }
+            for tool in ToolID.allCases {
+                guard let destination = destinations[tool] else { continue }
+                if managedLinkMatches(destination: destination, source: source) {
+                    try removeManagedLink(destination: destination, expectedSource: source, force: false)
+                } else if skill.targets.contains(tool), fileExistsIncludingSymlink(destination), force {
+                    try removeManagedLink(destination: destination, expectedSource: source, force: true)
+                }
+            }
+            catalog.skills[index].disabledAt = Date()
+            store.addingActivity(
+                ActivityEvent(
+                    kind: .unlinked,
+                    title: CoreL10n.choose("停用 Skill：\(skill.name)", "Disabled Skill: \(skill.name)"),
+                    detail: CoreL10n.choose("已从 Router 与所有 CLI 排除", "Excluded from Router and all CLIs")
+                ),
+                to: &catalog
+            )
+        } else {
+            if skill.mode == .managedDirect {
+                guard FileManager.default.fileExists(atPath: source.appendingPathComponent("SKILL.md").path) else {
+                    throw SkillManagerServiceError.missingSource(source.path)
+                }
+                for tool in skill.targets {
+                    guard let destination = destinations[tool], fileExistsIncludingSymlink(destination) else { continue }
+                    if !managedLinkMatches(destination: destination, source: source), !force {
+                        throw SkillManagerServiceError.conflict(destination.path)
+                    }
+                }
+                for tool in skill.targets {
+                    guard let destination = destinations[tool] else { continue }
+                    try createManagedLink(source: source, destination: destination, force: force)
+                }
+            }
+            catalog.skills[index].disabledAt = nil
+            store.addingActivity(
+                ActivityEvent(
+                    kind: .linked,
+                    title: CoreL10n.choose("重新启用 Skill：\(skill.name)", "Enabled Skill: \(skill.name)"),
+                    detail: skill.mode.displayName
                 ),
                 to: &catalog
             )
@@ -609,6 +761,93 @@ public struct SkillManagerService: Sendable {
                 managedSkillID: managedID
             )
         }
+    }
+
+    private func managedStateIssues(catalog: SkillCatalog) -> [ManagedStateIssue] {
+        managedLinkExpectations(catalog: catalog).compactMap { expectation in
+            if expectation.shouldExist,
+               !FileManager.default.fileExists(atPath: expectation.source.appendingPathComponent("SKILL.md").path) {
+                return ManagedStateIssue(
+                    managedSkillID: expectation.managedSkillID,
+                    name: expectation.name,
+                    tool: expectation.tool,
+                    destinationPath: expectation.destination.path,
+                    kind: .missingSource
+                )
+            }
+
+            let destinationExists = fileExistsIncludingSymlink(expectation.destination)
+            if expectation.shouldExist {
+                if !destinationExists {
+                    return ManagedStateIssue(
+                        managedSkillID: expectation.managedSkillID,
+                        name: expectation.name,
+                        tool: expectation.tool,
+                        destinationPath: expectation.destination.path,
+                        kind: .missingExpectedLink
+                    )
+                }
+                if !managedLinkMatches(destination: expectation.destination, source: expectation.source) {
+                    return ManagedStateIssue(
+                        managedSkillID: expectation.managedSkillID,
+                        name: expectation.name,
+                        tool: expectation.tool,
+                        destinationPath: expectation.destination.path,
+                        kind: .conflictingEntry
+                    )
+                }
+            } else if destinationExists,
+                      managedLinkMatches(destination: expectation.destination, source: expectation.source) {
+                return ManagedStateIssue(
+                    managedSkillID: expectation.managedSkillID,
+                    name: expectation.name,
+                    tool: expectation.tool,
+                    destinationPath: expectation.destination.path,
+                    kind: .unexpectedManagedLink
+                )
+            }
+            return nil
+        }
+    }
+
+    private func managedLinkExpectations(catalog: SkillCatalog) -> [ManagedLinkExpectation] {
+        var expectations: [ManagedLinkExpectation] = []
+        for skill in catalog.skills {
+            let source = URL(fileURLWithPath: skill.localPath, isDirectory: true).standardizedFileURL
+            for tool in ToolID.allCases {
+                expectations.append(
+                    ManagedLinkExpectation(
+                        managedSkillID: skill.id,
+                        name: skill.name,
+                        tool: tool,
+                        source: source,
+                        destination: paths.skillsDirectory(for: tool).appendingPathComponent(skill.name, isDirectory: true),
+                        shouldExist: !skill.isDisabled && skill.mode == .managedDirect && skill.targets.contains(tool)
+                    )
+                )
+            }
+        }
+        for tool in ToolID.allCases {
+            expectations.append(
+                ManagedLinkExpectation(
+                    managedSkillID: nil,
+                    name: "skill-router",
+                    tool: tool,
+                    source: paths.routerSkill,
+                    destination: paths.skillsDirectory(for: tool).appendingPathComponent("skill-router", isDirectory: true),
+                    shouldExist: catalog.router.installedTargets.contains(tool)
+                )
+            )
+        }
+        return expectations
+    }
+
+    private func managedLinkMatches(destination: URL, source: URL) -> Bool {
+        guard (try? destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == true else {
+            return false
+        }
+        return destination.resolvingSymlinksInPath().standardizedFileURL.path
+            == source.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     private func createManagedLink(source: URL, destination: URL, force: Bool) throws {

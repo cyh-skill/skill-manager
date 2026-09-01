@@ -84,6 +84,13 @@ private struct SkillManagerMenuBar: View {
         .disabled(model.isBusy)
 
         Button {
+            model.synchronizeManagedState()
+        } label: {
+            Label("同步托管状态", systemImage: "arrow.triangle.2.circlepath")
+        }
+        .disabled(model.isBusy || model.managedStateIssueCount == 0)
+
+        Button {
             model.checkForUpdates()
         } label: {
             Label(
@@ -96,9 +103,10 @@ private struct SkillManagerMenuBar: View {
         Divider()
 
         Text(L10n.string(
-            "托管直装 %lld · Lazy %lld",
+            "托管直装 %lld · Lazy %lld · Disabled %lld",
             Int64(model.directSkills.count),
-            Int64(model.lazySkills.count)
+            Int64(model.lazySkills.count),
+            Int64(model.disabledSkills.count)
         ))
         Label(
             L10n.string(model.githubAuthenticated ? "GitHub 已连接" : "GitHub 未连接"),

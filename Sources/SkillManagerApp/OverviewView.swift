@@ -47,6 +47,7 @@ struct OverviewView: View {
                         ForEach(ToolID.allCases) { tool in
                             let entries = model.snapshot.detectedSkills.filter { $0.tool == tool }
                             let pendingCount = entries.filter { $0.kind == .unmanagedDirect }.count
+                            let stateIssueCount = model.snapshot.managedStateIssues.filter { $0.tool == tool }.count
                             HStack(spacing: 12) {
                                 Image(systemName: tool.symbolName)
                                     .foregroundStyle(.tint)
@@ -64,6 +65,8 @@ struct OverviewView: View {
                                         .foregroundStyle(.secondary)
                                     Text(L10n.string("%lld 待初始化", Int64(pendingCount)))
                                         .foregroundStyle(pendingCount == 0 ? Color.secondary : Color.orange)
+                                    Text(L10n.string("%lld 待同步", Int64(stateIssueCount)))
+                                        .foregroundStyle(stateIssueCount == 0 ? Color.secondary : Color.orange)
                                 }
                                 .font(.caption)
                                 Button {

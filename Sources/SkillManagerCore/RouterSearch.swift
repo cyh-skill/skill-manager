@@ -5,7 +5,7 @@ public enum RouterSearch {
         let normalizedQuery = normalize(query)
         let tokens = normalizedQuery.split(separator: " ").map(String.init).filter { !$0.isEmpty }
         return catalog.skills
-            .filter { $0.mode == .lazy }
+            .filter { $0.mode == .lazy && !$0.isDisabled }
             .compactMap { skill -> RouterSearchResult? in
                 let score = score(skill: skill, normalizedQuery: normalizedQuery, tokens: tokens)
                 guard normalizedQuery.isEmpty || score > 0 else { return nil }

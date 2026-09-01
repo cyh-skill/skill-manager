@@ -36,7 +36,15 @@ struct RootView: View {
         } detail: {
             detailView
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
+                    ToolbarItemGroup(placement: .primaryAction) {
+                        Button {
+                            model.synchronizeManagedState()
+                        } label: {
+                            Label("同步托管状态", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        .disabled(model.isBusy || model.managedStateIssueCount == 0)
+                        .help("以 App 记录为准，修复 Skill Manager 托管的 CLI Skill 链接")
+
                         Button {
                             model.refresh()
                         } label: {

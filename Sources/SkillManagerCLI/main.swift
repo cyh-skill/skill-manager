@@ -66,7 +66,8 @@ struct SkillManagerCLI {
                 throw CLIError.missingArgument("id-or-name")
             }
             let skill = catalog.skills.first {
-                $0.mode == .lazy && ($0.id.uuidString.caseInsensitiveCompare(identifier) == .orderedSame
+                $0.mode == .lazy && !$0.isDisabled
+                    && ($0.id.uuidString.caseInsensitiveCompare(identifier) == .orderedSame
                     || $0.name.caseInsensitiveCompare(identifier) == .orderedSame)
             }
             guard let skill else { throw CLIError.notFound(identifier) }

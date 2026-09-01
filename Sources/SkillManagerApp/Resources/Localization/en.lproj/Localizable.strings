@@ -13,6 +13,7 @@
 
 "一个 GitHub 来源、两种加载方式、统一的 Lazy 冷库" = "One GitHub source, two loading modes, and one shared Lazy library";
 "托管直装" = "Managed Install";
+"已停用" = "Disabled";
 "通过软链接进入 CLI" = "Linked into each CLI";
 "Lazy 冷库" = "Lazy Library";
 "不进入 Agent 初始上下文" = "Not loaded into the agent's initial context";
@@ -23,6 +24,7 @@
 "%lld 待初始化" = "%lld pending";
 
 "GitHub 工作副本是唯一权威；在 Lazy 与托管直装之间切换" = "GitHub checkouts are authoritative; switch between Lazy and managed installs";
+"GitHub 工作副本是唯一权威；管理 Lazy、托管直装与停用状态" = "GitHub checkouts are authoritative; manage Lazy, managed, and disabled states";
 "检测更新" = "Check for Updates";
 "后台检测中" = "Checking in Background";
 "搜索名称、描述或 GitHub 仓库" = "Search names, descriptions, or GitHub repositories";
@@ -73,6 +75,8 @@
 "打开 GitHub" = "Open GitHub";
 "在 Finder 中显示" = "Show in Finder";
 "移出 Skill Manager" = "Remove from Skill Manager";
+"停用 Skill" = "Disable Skill";
+"重新启用 Skill" = "Enable Skill";
 "移出 Skill Manager？" = "Remove from Skill Manager?";
 "移出 %@" = "Remove %@";
 "会安全移除由本应用建立的 CLI 软链接；GitHub 工作副本仍保留在磁盘。" = "The CLI links created by this app will be removed safely; the GitHub checkout remains on disk.";
@@ -138,9 +142,15 @@
 "GitHub 未连接" = "GitHub Not Connected";
 "打开 Skill Manager" = "Open Skill Manager";
 "刷新本地状态" = "Refresh Local State";
+"同步托管状态" = "Sync Managed State";
+"以 App 记录为准，修复 Skill Manager 托管的 CLI Skill 链接" = "Use the app record to repair CLI Skill links managed by Skill Manager";
+"已与 App 记录一致" = "Matches App State";
+"%lld 项待同步" = "%lld to Sync";
+"同步只重建或移除 Skill Manager 托管的链接，不修改其他手工安装的 Skill。" = "Sync only recreates or removes links managed by Skill Manager. Other manually installed Skills are not changed.";
 "正在后台检测 GitHub 更新" = "Checking GitHub Updates in Background";
 "检测 GitHub 更新" = "Check GitHub Updates";
 "托管直装 %lld · Lazy %lld" = "Managed %lld · Lazy %lld";
+"托管直装 %lld · Lazy %lld · Disabled %lld" = "Managed %1$lld · Lazy %2$lld · Disabled %3$lld";
 "退出 Skill Manager" = "Quit Skill Manager";
 
 "正在检查 GitHub CLI…" = "Checking GitHub CLI…";
@@ -148,6 +158,8 @@
 "正在通过 GitHub 克隆并安装 %@…" = "Cloning and installing %@ through GitHub…";
 "正在托管直装…" = "Installing as managed…";
 "正在移回 Lazy 冷库…" = "Moving back to the Lazy library…";
+"正在停用 Skill…" = "Disabling Skill…";
+"正在重新启用 Skill…" = "Enabling Skill…";
 "正在移出 Skill Manager…" = "Removing from Skill Manager…";
 "正在保存 Router…" = "Saving Router…";
 "正在启用 Router…" = "Enabling Router…";
@@ -156,6 +168,10 @@
 "正在重新扫描现有 Skill…" = "Rescanning existing Skills…";
 "正在初始化 Skill Manager…" = "Initializing Skill Manager…";
 "正在刷新本地状态…" = "Refreshing local state…";
+"正在按 App 记录同步托管状态…" = "Syncing managed state from the app record…";
+"托管状态同步完成" = "Managed State Synchronized";
+"新建 %lld 个链接，修复 %lld 个链接，移除 %lld 个多余托管链接；%lld 个链接原本已一致。" = "Created %1$lld links, repaired %2$lld, removed %3$lld extra managed links; %4$lld links were already correct.";
+"GitHub 源码已是最新；CLI 链接状态请看同步提示" = "The GitHub source is current; see the sync indicator for CLI link state";
 "已导入为 Lazy Skill" = "Imported as Lazy Skill";
 "已完成托管直装" = "Managed Installation Complete";
 "从 %@ 导入了 %lld 个有效 Skill。" = "Imported %2$lld valid Skills from %1$@.";

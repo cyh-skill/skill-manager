@@ -61,6 +61,7 @@ public struct ManagedSkill: Identifiable, Codable, Hashable, Sendable {
     public var revisionDate: Date?
     public var mode: InstallMode
     public var targets: Set<ToolID>
+    public var disabledAt: Date?
     public var installedAt: Date
     public var updatedAt: Date
     public var lastCheckedAt: Date?
@@ -80,6 +81,7 @@ public struct ManagedSkill: Identifiable, Codable, Hashable, Sendable {
         revisionDate: Date? = nil,
         mode: InstallMode = .lazy,
         targets: Set<ToolID> = [],
+        disabledAt: Date? = nil,
         installedAt: Date = Date(),
         updatedAt: Date = Date(),
         lastCheckedAt: Date? = nil,
@@ -98,6 +100,7 @@ public struct ManagedSkill: Identifiable, Codable, Hashable, Sendable {
         self.revisionDate = revisionDate
         self.mode = mode
         self.targets = targets
+        self.disabledAt = disabledAt
         self.installedAt = installedAt
         self.updatedAt = updatedAt
         self.lastCheckedAt = lastCheckedAt
@@ -109,6 +112,8 @@ public struct ManagedSkill: Identifiable, Codable, Hashable, Sendable {
     public var identityKey: String {
         "\(repository.lowercased())#\(repositoryPath.lowercased())"
     }
+
+    public var isDisabled: Bool { disabledAt != nil }
 }
 
 public struct DetectedSkill: Identifiable, Codable, Hashable, Sendable {
@@ -416,12 +421,69 @@ public struct RouterSearchResult: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public enum ManagedStateIssueKind: String, Codable, Hashable, Sendable {
+    case missingExpectedLink = "missing-expected-link"
+    case conflictingEntry = "conflicting-entry"
+    case unexpectedManagedLink = "unexpected-managed-link"
+    case missingSource = "missing-source"
+}
+
+public struct ManagedStateIssue: Identifiable, Codable, Hashable, Sendable {
+    public var id: String { "\(tool.rawValue):\(destinationPath):\(kind.rawValue)" }
+    public var managedSkillID: UUID?
+    public var name: String
+    public var tool: ToolID
+    public var destinationPath: String
+    public var kind: ManagedStateIssueKind
+
+    public init(
+        managedSkillID: UUID?,
+        name: String,
+        tool: ToolID,
+        destinationPath: String,
+        kind: ManagedStateIssueKind
+    ) {
+        self.managedSkillID = managedSkillID
+        self.name = name
+        self.tool = tool
+        self.destinationPath = destinationPath
+        self.kind = kind
+    }
+}
+
+public struct ManagedStateSyncResult: Codable, Hashable, Sendable {
+    public var createdLinks: Int
+    public var repairedLinks: Int
+    public var removedLinks: Int
+    public var unchangedLinks: Int
+
+    public init(
+        createdLinks: Int = 0,
+        repairedLinks: Int = 0,
+        removedLinks: Int = 0,
+        unchangedLinks: Int = 0
+    ) {
+        self.createdLinks = createdLinks
+        self.repairedLinks = repairedLinks
+        self.removedLinks = removedLinks
+        self.unchangedLinks = unchangedLinks
+    }
+
+    public var changedLinks: Int { createdLinks + repairedLinks + removedLinks }
+}
+
 public struct WorkspaceSnapshot: Sendable {
     public var catalog: SkillCatalog
     public var detectedSkills: [DetectedSkill]
+    public var managedStateIssues: [ManagedStateIssue]
 
-    public init(catalog: SkillCatalog, detectedSkills: [DetectedSkill]) {
+    public init(
+        catalog: SkillCatalog,
+        detectedSkills: [DetectedSkill],
+        managedStateIssues: [ManagedStateIssue] = []
+    ) {
         self.catalog = catalog
         self.detectedSkills = detectedSkills
+        self.managedStateIssues = managedStateIssues
     }
 }

@@ -11,6 +11,10 @@ struct ToolsView: View {
         }
     }
 
+    private var stateIssues: [ManagedStateIssue] {
+        model.snapshot.managedStateIssues.filter { $0.tool == selectedTool }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -28,6 +32,13 @@ struct ToolsView: View {
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .fixedSize()
+                    Button {
+                        model.synchronizeManagedState()
+                    } label: {
+                        Label("同步托管状态", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(model.isBusy || model.managedStateIssueCount == 0)
                 }
 
                 Panel {
@@ -44,6 +55,20 @@ struct ToolsView: View {
                             Button("在 Finder 中显示") {
                                 model.reveal(model.paths.skillsDirectory(for: selectedTool).path)
                             }
+                        }
+                        Divider()
+                        HStack(spacing: 8) {
+                            Label(
+                                stateIssues.isEmpty
+                                    ? L10n.string("已与 App 记录一致")
+                                    : L10n.string("%lld 项待同步", Int64(stateIssues.count)),
+                                systemImage: stateIssues.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                            )
+                            .foregroundStyle(stateIssues.isEmpty ? Color.green : Color.orange)
+                            Spacer()
+                            Text("同步只重建或移除 Skill Manager 托管的链接，不修改其他手工安装的 Skill。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         Divider()
                         Toggle(

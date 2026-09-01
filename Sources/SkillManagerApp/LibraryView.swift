@@ -5,6 +5,7 @@ private enum LibraryFilter: String, CaseIterable, Identifiable {
     case all
     case direct
     case lazy
+    case disabled
 
     var id: String { rawValue }
     var title: String {
@@ -12,6 +13,7 @@ private enum LibraryFilter: String, CaseIterable, Identifiable {
         case .all: L10n.string("全部")
         case .direct: L10n.string("托管直装")
         case .lazy: "Lazy"
+        case .disabled: "Disabled"
         }
     }
 }
@@ -35,8 +37,9 @@ struct LibraryView: View {
     private var filteredSkills: [ManagedSkill] {
         model.managedSkills.filter { skill in
             let modeMatches = filter == .all
-                || (filter == .direct && skill.mode == .managedDirect)
-                || (filter == .lazy && skill.mode == .lazy)
+                || (filter == .direct && skill.mode == .managedDirect && !skill.isDisabled)
+                || (filter == .lazy && skill.mode == .lazy && !skill.isDisabled)
+                || (filter == .disabled && skill.isDisabled)
             let queryMatches = normalizedQuery.isEmpty
                 || skill.name.localizedCaseInsensitiveContains(normalizedQuery)
                 || skill.description.localizedCaseInsensitiveContains(normalizedQuery)
@@ -51,7 +54,7 @@ struct LibraryView: View {
                 HStack(spacing: 14) {
                     PageHeader(
                         title: "全部 Skills",
-                        subtitle: "GitHub 工作副本是唯一权威；在 Lazy 与托管直装之间切换",
+                        subtitle: "GitHub 工作副本是唯一权威；管理 Lazy、托管直装与停用状态",
                         symbol: "books.vertical"
                     )
                     Button {
@@ -80,7 +83,7 @@ struct LibraryView: View {
                         }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 300)
+                    .frame(width: 400)
                     Button {
                         showImportSheet = true
                     } label: {
@@ -494,20 +497,32 @@ struct LibraryView: View {
     }
 
     private func skillRow(_ skill: ManagedSkill) -> some View {
-        Panel {
+        let accentColor: Color = skill.isDisabled ? .gray : (skill.mode == .lazy ? .indigo : .green)
+        return Panel {
             HStack(alignment: .top, spacing: 14) {
-                Image(systemName: skill.mode == .lazy ? "moon.stars.fill" : "link.circle.fill")
+                Image(systemName: skill.isDisabled ? "pause.circle.fill" : (skill.mode == .lazy ? "moon.stars.fill" : "link.circle.fill"))
                     .font(.title2)
-                    .foregroundStyle(skill.mode == .lazy ? Color.indigo : Color.green)
+                    .foregroundStyle(accentColor)
                     .frame(width: 42, height: 42)
-                    .background((skill.mode == .lazy ? Color.indigo : Color.green).opacity(0.1), in: RoundedRectangle(cornerRadius: 11))
+                    .background(accentColor.opacity(0.1), in: RoundedRectangle(cornerRadius: 11))
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Text(skill.name)
                             .font(.headline)
-                        ModeBadge(mode: skill.mode)
-                        ForEach(skill.targets.sorted(by: { $0.rawValue < $1.rawValue })) { tool in
-                            ToolPill(tool: tool)
+                        ModeBadge(mode: skill.mode, isDisabled: skill.isDisabled)
+                        if !skill.isDisabled {
+                            ForEach(skill.targets.sorted(by: { $0.rawValue < $1.rawValue })) { tool in
+                                ToolPill(tool: tool)
+                            }
+                        }
+                        let stateIssues = model.managedStateIssues(for: skill)
+                        if !stateIssues.isEmpty {
+                            Label(L10n.string("%lld 项待同步", Int64(stateIssues.count)), systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.orange.opacity(0.11), in: Capsule())
                         }
                         if model.isUpdating(skill) {
                             backgroundUpdateBadge
@@ -535,17 +550,28 @@ struct LibraryView: View {
                 }
                 Spacer(minLength: 18)
                 Menu {
-                    ForEach(ToolID.allCases) { tool in
-                        let installed = skill.targets.contains(tool)
-                        Button {
-                            model.setSkill(skill, tool: tool, enabled: !installed)
-                        } label: {
-                            Label(
-                                installed
-                                    ? L10n.string("从 %@ 移除", tool.displayName)
-                                    : L10n.string("托管直装到 %@", tool.displayName),
-                                systemImage: installed ? "link.badge.minus" : "link.badge.plus"
-                            )
+                    Button {
+                        model.setSkillDisabled(skill, disabled: !skill.isDisabled)
+                    } label: {
+                        Label(
+                            skill.isDisabled ? L10n.string("重新启用 Skill") : L10n.string("停用 Skill"),
+                            systemImage: skill.isDisabled ? "play.circle" : "pause.circle"
+                        )
+                    }
+                    if !skill.isDisabled {
+                        Divider()
+                        ForEach(ToolID.allCases) { tool in
+                            let installed = skill.targets.contains(tool)
+                            Button {
+                                model.setSkill(skill, tool: tool, enabled: !installed)
+                            } label: {
+                                Label(
+                                    installed
+                                        ? L10n.string("从 %@ 移除", tool.displayName)
+                                        : L10n.string("托管直装到 %@", tool.displayName),
+                                    systemImage: installed ? "link.badge.minus" : "link.badge.plus"
+                                )
+                            }
                         }
                     }
                     Divider()
@@ -579,6 +605,8 @@ struct LibraryView: View {
                 .fixedSize()
             }
         }
+        .saturation(skill.isDisabled ? 0 : 1)
+        .opacity(skill.isDisabled ? 0.58 : 1)
     }
 
     @ViewBuilder
@@ -594,7 +622,7 @@ struct LibraryView: View {
             .help(L10n.string("点击更新 %@", check.repository))
         } else {
             updateBadgeLabel(check)
-                .help(check.errorMessage ?? L10n.string("已是最新"))
+                .help(check.errorMessage ?? L10n.string("GitHub 源码已是最新；CLI 链接状态请看同步提示"))
         }
     }
 

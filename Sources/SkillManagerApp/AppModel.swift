@@ -94,14 +94,41 @@ final class AppModel {
     }
 
     var managedSkills: [ManagedSkill] { snapshot.catalog.skills }
-    var lazySkills: [ManagedSkill] { managedSkills.filter { $0.mode == .lazy } }
-    var directSkills: [ManagedSkill] { managedSkills.filter { $0.mode == .managedDirect } }
+    var lazySkills: [ManagedSkill] { managedSkills.filter { $0.mode == .lazy && !$0.isDisabled } }
+    var directSkills: [ManagedSkill] { managedSkills.filter { $0.mode == .managedDirect && !$0.isDisabled } }
+    var disabledSkills: [ManagedSkill] { managedSkills.filter(\.isDisabled) }
     var unmanagedSkills: [DetectedSkill] { snapshot.detectedSkills.filter { $0.kind == .unmanagedDirect } }
     var unmanagedSkillCount: Int { Set(unmanagedSkills.map(\.resolvedPath)).count }
+    var managedStateIssueCount: Int { snapshot.managedStateIssues.count }
     var hasBackgroundGitOperation: Bool { updatingRepositoryKey != nil || isCheckingForUpdates }
 
     func refresh() {
         Task { await reloadWorkspace() }
+    }
+
+    func managedStateIssues(for skill: ManagedSkill) -> [ManagedStateIssue] {
+        snapshot.managedStateIssues.filter { $0.managedSkillID == skill.id }
+    }
+
+    func synchronizeManagedState() {
+        Task {
+            await performAllowingForce(localized("正在按 App 记录同步托管状态…")) { [self] force in
+                let result = try await Task.detached { [service] in
+                    try service.synchronizeManagedState(force: force)
+                }.value
+                await reloadWorkspace(showBusy: false)
+                notice = AppNotice(
+                    title: localized("托管状态同步完成"),
+                    message: localized(
+                        "新建 %lld 个链接，修复 %lld 个链接，移除 %lld 个多余托管链接；%lld 个链接原本已一致。",
+                        Int64(result.createdLinks),
+                        Int64(result.repairedLinks),
+                        Int64(result.removedLinks),
+                        Int64(result.unchangedLinks)
+                    )
+                )
+            }
+        }
     }
 
     func importRepository(_ repository: String, mode: InstallMode) {
@@ -284,6 +311,17 @@ final class AppModel {
             await performAllowingForce(localized(enabled ? "正在托管直装…" : "正在移回 Lazy 冷库…")) { [self] force in
                 try await Task.detached { [service] in
                     try service.setSkill(skill.id, installedOn: tool, enabled: enabled, force: force)
+                }.value
+                await reloadWorkspace(showBusy: false)
+            }
+        }
+    }
+
+    func setSkillDisabled(_ skill: ManagedSkill, disabled: Bool) {
+        Task {
+            await performAllowingForce(localized(disabled ? "正在停用 Skill…" : "正在重新启用 Skill…")) { [self] force in
+                try await Task.detached { [service] in
+                    try service.setSkillDisabled(skill.id, disabled: disabled, force: force)
                 }.value
                 await reloadWorkspace(showBusy: false)
             }

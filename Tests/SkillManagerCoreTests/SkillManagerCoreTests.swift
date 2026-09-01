@@ -223,12 +223,23 @@ final class RouterSearchTests: XCTestCase {
                 revision: "abc",
                 mode: .managedDirect,
                 targets: [.codex]
+            ),
+            ManagedSkill(
+                name: "pdf-disabled",
+                description: "Disabled PDF workflow",
+                sourceURL: "https://github.com/example/skills/tree/main/pdf-disabled",
+                repository: "example/skills",
+                repositoryPath: "pdf-disabled",
+                localPath: "/tmp/pdf-disabled",
+                revision: "abc",
+                disabledAt: Date()
             )
         ])
 
         let results = RouterSearch.search(query: "pdf", catalog: catalog)
         XCTAssertEqual(results.map(\.name), ["pdf-tools", "document-tools"])
         XCTAssertFalse(results.contains { $0.name == "pdf-direct" })
+        XCTAssertFalse(results.contains { $0.name == "pdf-disabled" })
     }
 }
 
@@ -290,6 +301,146 @@ final class SkillManagerServiceTests: XCTestCase {
         try service.setSkill(skill.id, installedOn: .codex, enabled: false)
         XCTAssertFalse(FileManager.default.fileExists(atPath: entry.path))
         XCTAssertEqual(try service.store.load().skills[0].mode, .lazy)
+    }
+
+    func testDisabledSkillIsRemovedFromCLIsAndCanRestoreItsPreviousTargets() throws {
+        let skillRoot = paths.sources.appendingPathComponent("owner/repo/sample", isDirectory: true)
+        try FileManager.default.createDirectory(at: skillRoot, withIntermediateDirectories: true)
+        try Self.skillContent(name: "sample").write(
+            to: skillRoot.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let skill = ManagedSkill(
+            name: "sample",
+            description: "Sample workflow",
+            sourceURL: "https://github.com/owner/repo/tree/main/sample",
+            repository: "owner/repo",
+            repositoryPath: "sample",
+            localPath: skillRoot.path,
+            revision: "abc123"
+        )
+        var catalog = try service.store.load()
+        catalog.skills = [skill]
+        try service.store.save(catalog)
+
+        try service.setSkill(skill.id, installedOn: .codex, enabled: true)
+        try service.setSkill(skill.id, installedOn: .claudeCode, enabled: true)
+        let codexEntry = paths.skillsDirectory(for: .codex).appendingPathComponent("sample", isDirectory: true)
+        let claudeEntry = paths.skillsDirectory(for: .claudeCode).appendingPathComponent("sample", isDirectory: true)
+
+        try service.setSkillDisabled(skill.id, disabled: true)
+        let disabled = try XCTUnwrap(service.store.load().skills.first)
+        XCTAssertTrue(disabled.isDisabled)
+        XCTAssertEqual(disabled.mode, .managedDirect)
+        XCTAssertEqual(disabled.targets, [.codex, .claudeCode])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: codexEntry.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: claudeEntry.path))
+        XCTAssertThrowsError(try service.setSkill(skill.id, installedOn: .codex, enabled: true))
+        XCTAssertTrue(try service.snapshot().managedStateIssues.isEmpty)
+
+        try service.setSkillDisabled(skill.id, disabled: false)
+        let restored = try XCTUnwrap(service.store.load().skills.first)
+        XCTAssertFalse(restored.isDisabled)
+        XCTAssertEqual(restored.targets, [.codex, .claudeCode])
+        XCTAssertEqual(codexEntry.resolvingSymlinksInPath().standardizedFileURL.path, skillRoot.standardizedFileURL.path)
+        XCTAssertEqual(claudeEntry.resolvingSymlinksInPath().standardizedFileURL.path, skillRoot.standardizedFileURL.path)
+    }
+
+    func testSynchronizeManagedStateRestoresCatalogLinksAndRemovesStaleManagedLinks() throws {
+        let directRoot = paths.sources.appendingPathComponent("owner/repo/direct", isDirectory: true)
+        let lazyRoot = paths.sources.appendingPathComponent("owner/repo/lazy", isDirectory: true)
+        for (root, name) in [(directRoot, "direct"), (lazyRoot, "lazy")] {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            try Self.skillContent(name: name).write(
+                to: root.appendingPathComponent("SKILL.md"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+
+        let direct = ManagedSkill(
+            name: "direct",
+            description: "Direct workflow",
+            sourceURL: "https://github.com/owner/repo/tree/main/direct",
+            repository: "owner/repo",
+            repositoryPath: "direct",
+            localPath: directRoot.path,
+            revision: "abc123",
+            mode: .managedDirect,
+            targets: [.codex]
+        )
+        let lazy = ManagedSkill(
+            name: "lazy",
+            description: "Lazy workflow",
+            sourceURL: "https://github.com/owner/repo/tree/main/lazy",
+            repository: "owner/repo",
+            repositoryPath: "lazy",
+            localPath: lazyRoot.path,
+            revision: "abc123"
+        )
+        var catalog = try service.store.load()
+        catalog.skills = [direct, lazy]
+        catalog.router.installedTargets = [.codex]
+        try service.store.save(catalog)
+
+        let staleLazyLink = paths.skillsDirectory(for: .claudeCode).appendingPathComponent("lazy", isDirectory: true)
+        try FileManager.default.createDirectory(at: staleLazyLink.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: staleLazyLink, withDestinationURL: lazyRoot)
+
+        let issuesBefore = try service.snapshot().managedStateIssues
+        XCTAssertEqual(issuesBefore.count, 3)
+        XCTAssertEqual(Set(issuesBefore.map(\.kind)), [.missingExpectedLink, .unexpectedManagedLink])
+
+        let result = try service.synchronizeManagedState()
+        XCTAssertEqual(result.createdLinks, 2)
+        XCTAssertEqual(result.repairedLinks, 0)
+        XCTAssertEqual(result.removedLinks, 1)
+        XCTAssertEqual(result.changedLinks, 3)
+
+        let directLink = paths.skillsDirectory(for: .codex).appendingPathComponent("direct", isDirectory: true)
+        let routerLink = paths.skillsDirectory(for: .codex).appendingPathComponent("skill-router", isDirectory: true)
+        XCTAssertEqual(directLink.resolvingSymlinksInPath().standardizedFileURL.path, directRoot.standardizedFileURL.path)
+        XCTAssertEqual(routerLink.resolvingSymlinksInPath().standardizedFileURL.path, paths.routerSkill.standardizedFileURL.path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staleLazyLink.path))
+        XCTAssertTrue(try service.snapshot().managedStateIssues.isEmpty)
+
+        let secondResult = try service.synchronizeManagedState()
+        XCTAssertEqual(secondResult.changedLinks, 0)
+        XCTAssertEqual(secondResult.unchangedLinks, 2)
+    }
+
+    func testSynchronizeManagedStateDoesNotOverwriteConflictingContentWithoutForce() throws {
+        let skillRoot = paths.sources.appendingPathComponent("owner/repo/sample", isDirectory: true)
+        try FileManager.default.createDirectory(at: skillRoot, withIntermediateDirectories: true)
+        try Self.skillContent(name: "sample").write(
+            to: skillRoot.appendingPathComponent("SKILL.md"),
+            atomically: true,
+            encoding: .utf8
+        )
+        var catalog = try service.store.load()
+        catalog.skills = [
+            ManagedSkill(
+                name: "sample",
+                description: "Sample workflow",
+                sourceURL: "https://github.com/owner/repo/tree/main/sample",
+                repository: "owner/repo",
+                repositoryPath: "sample",
+                localPath: skillRoot.path,
+                revision: "abc123",
+                mode: .managedDirect,
+                targets: [.codex]
+            )
+        ]
+        try service.store.save(catalog)
+
+        let entry = paths.skillsDirectory(for: .codex).appendingPathComponent("sample", isDirectory: true)
+        try FileManager.default.createDirectory(at: entry, withIntermediateDirectories: true)
+        try "keep me".write(to: entry.appendingPathComponent("existing.txt"), atomically: true, encoding: .utf8)
+
+        XCTAssertThrowsError(try service.synchronizeManagedState())
+        XCTAssertTrue(FileManager.default.fileExists(atPath: entry.appendingPathComponent("existing.txt").path))
+        XCTAssertEqual(try service.snapshot().managedStateIssues.map(\.kind), [.conflictingEntry])
     }
 
     func testBootstrapNeverReplacesExistingRouterContent() throws {
