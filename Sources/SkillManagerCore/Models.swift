@@ -4,6 +4,8 @@ public enum ToolID: String, CaseIterable, Codable, Hashable, Identifiable, Senda
     case codex
     case claudeCode = "claude-code"
 
+    public static let displayOrder: [ToolID] = [.codex, .claudeCode]
+
     public var id: String { rawValue }
 
     public var displayName: String {

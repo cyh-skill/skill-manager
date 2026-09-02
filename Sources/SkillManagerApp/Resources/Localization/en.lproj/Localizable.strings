@@ -88,7 +88,7 @@
 "后台更新中" = "Updating in Background";
 "点击更新 %@" = "Update %@";
 
-"查看每个 CLI 当前真正加载的 Skill；Lazy 冷库跨 CLI 共享" = "See the Skills actually loaded by each CLI; the Lazy library is shared";
+"优先展示 Codex，同时兼容 Claude Code；Lazy 冷库跨 CLI 共享" = "Codex is shown first with Claude Code compatibility; the Lazy library is shared across CLIs";
 "启用内置 Skill Router" = "Enable Built-in Skill Router";
 "Router 是 CLI 中唯一需要常驻的入口；%lld 个 Lazy Skill 不会复制到此目录。" = "Router is the only persistent CLI entry; %lld Lazy Skills are not copied into this directory.";
 "当前加载" = "Currently Loaded";

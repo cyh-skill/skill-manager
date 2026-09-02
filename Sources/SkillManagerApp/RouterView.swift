@@ -20,7 +20,7 @@ struct RouterView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Label("安装目标", systemImage: "terminal")
                                     .font(.headline)
-                                ForEach(ToolID.allCases) { tool in
+                                ForEach(ToolID.displayOrder) { tool in
                                     Toggle(
                                         L10n.string(tool.displayName),
                                         isOn: Binding(

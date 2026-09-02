@@ -560,7 +560,7 @@ struct LibraryView: View {
                     }
                     if !skill.isDisabled {
                         Divider()
-                        ForEach(ToolID.allCases) { tool in
+                        ForEach(ToolID.displayOrder) { tool in
                             let installed = skill.targets.contains(tool)
                             Button {
                                 model.setSkill(skill, tool: tool, enabled: !installed)

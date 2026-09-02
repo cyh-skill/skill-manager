@@ -25,6 +25,31 @@ final class SkillDocumentParserTests: XCTestCase {
     }
 }
 
+final class PlatformCompatibilityTests: XCTestCase {
+    func testCodexIsPrimaryAndSupportsCurrentAndLegacySkillDirectories() {
+        let home = URL(fileURLWithPath: "/tmp/skill-manager-platform-tests", isDirectory: true)
+        let paths = ManagerPaths(environment: ["HOME": home.path])
+
+        XCTAssertEqual(ToolID.displayOrder, [.codex, .claudeCode])
+        XCTAssertEqual(paths.skillsDirectory(for: .codex), home.appendingPathComponent(".agents/skills", isDirectory: true))
+        XCTAssertEqual(
+            paths.legacySkillsDirectories(for: .codex),
+            [home.appendingPathComponent(".codex/skills", isDirectory: true)]
+        )
+        XCTAssertEqual(paths.skillsDirectory(for: .claudeCode), home.appendingPathComponent(".claude/skills", isDirectory: true))
+    }
+
+    func testCodexDirectoryOverrideRemainsSupported() {
+        let override = "/tmp/skill-manager-platform-tests/codex-override"
+        let paths = ManagerPaths(environment: [
+            "HOME": "/tmp/skill-manager-platform-tests",
+            "SKILL_MANAGER_CODEX_SKILLS_DIR": override
+        ])
+
+        XCTAssertEqual(paths.skillsDirectory(for: .codex).path, override)
+    }
+}
+
 final class GitHubLocationTests: XCTestCase {
     func testParsesHTTPSAndSSHLocations() throws {
         XCTAssertEqual(try GitHubLocation.parse("https://github.com/openai/skills.git").fullName, "openai/skills")

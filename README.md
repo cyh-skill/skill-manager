@@ -1,6 +1,6 @@
 # Skill Manager
 
-Skill Manager 是一个使用 SwiftUI 构建的原生 macOS Skill 管理器。它以 GitHub 仓库作为唯一来源，统一管理 Codex 与 Claude Code 的 Skill，并提供“托管直装”和“Lazy Router”两种加载方式。
+Skill Manager 是一个使用 SwiftUI 构建的原生 macOS Skill 管理器。它以 Codex 为主要管理入口，同时完整兼容 Claude Code，并以 GitHub 仓库作为 Skill 的唯一来源，提供“托管直装”和“Lazy Router”两种加载方式。
 
 ## 为什么需要 Lazy Skill
 
@@ -48,7 +48,7 @@ Skill Manager 内置并管理一个可编辑的 `skill-router`。Router 通过 c
 
 - 从明确的 GitHub URL 导入仓库中的全部有效 `SKILL.md`，并在弹窗中选择 Lazy 或托管直装
 - 进入 Skill 库并输入搜索词后并行查询 skills.sh 与 GitHub，两路结果都只通过已认证的 `gh` 从 GitHub 安装
-- 扫描 Codex `~/.agents/skills`、旧版 `~/.codex/skills` 与 Claude Code `~/.claude/skills`
+- 默认优先展示 Codex，并扫描当前 `~/.agents/skills` 与旧版 `~/.codex/skills`；同时兼容 Claude Code `~/.claude/skills`
 - 首次启动迁移向导：迁移时每个历史 Skill 必须进入主 Skill 或 Router；向导可随时关闭并稍后重开
 - 迁移前自动备份；整批任意一步失败时恢复原目录，避免半迁移状态
 - 在“全部 Skills”中逐条管理历史未托管入口，可将指定 CLI 中的单个入口安全移到 macOS 废纸篓

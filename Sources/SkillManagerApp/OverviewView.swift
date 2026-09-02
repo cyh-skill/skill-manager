@@ -44,7 +44,7 @@ struct OverviewView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         Label("CLI 状态", systemImage: "terminal")
                             .font(.headline)
-                        ForEach(ToolID.allCases) { tool in
+                        ForEach(ToolID.displayOrder) { tool in
                             let entries = model.snapshot.detectedSkills.filter { $0.tool == tool }
                             let pendingCount = entries.filter { $0.kind == .unmanagedDirect }.count
                             let stateIssueCount = model.snapshot.managedStateIssues.filter { $0.tool == tool }.count

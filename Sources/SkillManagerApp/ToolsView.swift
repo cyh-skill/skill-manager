@@ -21,11 +21,11 @@ struct ToolsView: View {
                 HStack(alignment: .center, spacing: 24) {
                     PageHeader(
                         title: "CLI 管理",
-                        subtitle: "查看每个 CLI 当前真正加载的 Skill；Lazy 冷库跨 CLI 共享",
+                        subtitle: "优先展示 Codex，同时兼容 Claude Code；Lazy 冷库跨 CLI 共享",
                         symbol: "terminal"
                     )
                     Picker("CLI", selection: $selectedTool) {
-                        ForEach(ToolID.allCases) { tool in
+                        ForEach(ToolID.displayOrder) { tool in
                             Label(L10n.string(tool.displayName), systemImage: tool.symbolName).tag(tool)
                         }
                     }
