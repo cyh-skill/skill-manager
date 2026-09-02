@@ -18,6 +18,13 @@ mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$bin_dir/SkillManager" "$app_dir/Contents/MacOS/SkillManager"
 cp "$bin_dir/skill-manager-cli" "$app_dir/Contents/Resources/skill-manager-cli"
 cp "$project_dir/Resources/Info.plist" "$app_dir/Contents/Info.plist"
+source_revision="$(git rev-parse --short=12 HEAD 2>/dev/null || true)"
+if [ -n "$source_revision" ]; then
+    if [ -n "$(git status --porcelain)" ]; then
+        source_revision="$source_revision-dirty"
+    fi
+    /usr/libexec/PlistBuddy -c "Add :SkillManagerSourceRevision string $source_revision" "$app_dir/Contents/Info.plist"
+fi
 cp "$project_dir/Resources/AppIcon.icns" "$app_dir/Contents/Resources/AppIcon.icns"
 cp "$project_dir/LICENSE" "$app_dir/Contents/Resources/LICENSE"
 mkdir -p "$app_dir/Contents/Resources/skill-router"

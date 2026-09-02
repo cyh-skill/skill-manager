@@ -15,6 +15,16 @@ struct SettingsView: View {
 
                 Panel {
                     VStack(alignment: .leading, spacing: 14) {
+                        Label("版本信息", systemImage: "info.circle")
+                            .font(.headline)
+                        versionRow("版本", value: bundleValue("CFBundleShortVersionString") ?? L10n.string("开发构建"))
+                        versionRow("Build", value: bundleValue("CFBundleVersion") ?? "—")
+                        versionRow("源码提交", value: bundleValue("SkillManagerSourceRevision") ?? L10n.string("开发构建"))
+                    }
+                }
+
+                Panel {
+                    VStack(alignment: .leading, spacing: 14) {
                         HStack {
                             Label("GitHub CLI", systemImage: "person.crop.circle")
                                 .font(.headline)
@@ -106,5 +116,21 @@ struct SettingsView: View {
             }
             .buttonStyle(.borderless)
         }
+    }
+
+    private func versionRow(_ title: String, value: String) -> some View {
+        HStack(spacing: 12) {
+            Text(L10n.string(title))
+                .frame(width: 130, alignment: .leading)
+            Text(value)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+            Spacer()
+        }
+    }
+
+    private func bundleValue(_ key: String) -> String? {
+        Bundle.main.object(forInfoDictionaryKey: key) as? String
     }
 }

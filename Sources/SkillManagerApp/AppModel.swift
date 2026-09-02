@@ -6,6 +6,7 @@ import SkillManagerCore
 enum NavigationItem: String, CaseIterable, Identifiable {
     case overview
     case library
+    case market
     case tools
     case router
     case activity
@@ -17,6 +18,7 @@ enum NavigationItem: String, CaseIterable, Identifiable {
         switch self {
         case .overview: L10n.string("概览")
         case .library: L10n.string("全部 Skills")
+        case .market: L10n.string("Skill 市场")
         case .tools: L10n.string("CLI 管理")
         case .router: "Skill Router"
         case .activity: L10n.string("操作记录")
@@ -28,6 +30,7 @@ enum NavigationItem: String, CaseIterable, Identifiable {
         switch self {
         case .overview: "square.grid.2x2"
         case .library: "books.vertical"
+        case .market: "storefront"
         case .tools: "terminal"
         case .router: "point.3.connected.trianglepath.dotted"
         case .activity: "clock.arrow.circlepath"
@@ -77,6 +80,9 @@ final class AppModel {
     var skillsShSearchError: String?
     var githubSearchError: String?
     var isSearchingSkills = false
+    var skillLeaderboardResults: [DiscoveredSkill] = []
+    var skillLeaderboardError: String?
+    var isLoadingSkillLeaderboard = false
     var updatingRepositoryKeys: Set<String> = []
     var isCheckingForUpdates = false
     var isBusy = false
@@ -170,6 +176,17 @@ final class AppModel {
         githubResults = []
         skillsShSearchError = nil
         githubSearchError = nil
+    }
+
+    func loadSkillLeaderboard(force: Bool = false) async {
+        guard !isLoadingSkillLeaderboard else { return }
+        guard force || skillLeaderboardResults.isEmpty else { return }
+        isLoadingSkillLeaderboard = true
+        skillLeaderboardError = nil
+        let outcome = await discoveryService.fetchSkillsShLeaderboard()
+        skillLeaderboardResults = outcome.results
+        skillLeaderboardError = outcome.errorMessage
+        isLoadingSkillLeaderboard = false
     }
 
     func searchSkills(_ query: String) async {

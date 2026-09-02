@@ -10,6 +10,7 @@ struct RootView: View {
                 Section("Skill Manager") {
                     sidebarRow(.overview)
                     sidebarRow(.library, count: model.managedSkills.count + model.unmanagedSkillCount)
+                    sidebarRow(.market)
                     sidebarRow(.tools)
                     sidebarRow(.router)
                 }
@@ -98,6 +99,7 @@ struct RootView: View {
         switch model.selection ?? .overview {
         case .overview: OverviewView()
         case .library: LibraryView()
+        case .market: SkillMarketView()
         case .tools: ToolsView()
         case .router: RouterView()
         case .activity: ActivityView()

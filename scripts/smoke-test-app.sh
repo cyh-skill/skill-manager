@@ -39,6 +39,15 @@ if [ "$bundle_copyright" != "Copyright © 2026 cyh-skill" ]; then
     echo "Unexpected bundle copyright: $bundle_copyright" >&2
     exit 1
 fi
+bundle_revision="$(/usr/libexec/PlistBuddy -c 'Print :SkillManagerSourceRevision' "$app_dir/Contents/Info.plist")"
+expected_revision="$(git -C "$project_dir" rev-parse --short=12 HEAD)"
+if [ -n "$(git -C "$project_dir" status --porcelain)" ]; then
+    expected_revision="$expected_revision-dirty"
+fi
+if [ "$bundle_revision" != "$expected_revision" ]; then
+    echo "Unexpected source revision: $bundle_revision (expected $expected_revision)" >&2
+    exit 1
+fi
 
 SKILL_MANAGER_HOME="$smoke_root/manager" \
 SKILL_MANAGER_CODEX_SKILLS_DIR="$smoke_root/codex-skills" \

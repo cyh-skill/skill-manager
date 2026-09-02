@@ -215,6 +215,30 @@ final class SkillDiscoveryServiceTests: XCTestCase {
         XCTAssertEqual(results[0].repositoryPath, "skills/productivity/pdf")
         XCTAssertEqual(results[0].discoverySource, .github)
     }
+
+    func testDecodesSkillsShLeaderboardInPublishedOrderAndDeduplicates() throws {
+        let data = Data(
+            #"<script>payload,\"initialSkills\":[{\"source\":\"vercel-labs/skills\",\"skillId\":\"find-skills\",\"name\":\"find-skills\",\"installs\":3215790},{\"source\":\"anthropics/skills\",\"skillId\":\"frontend-design\",\"name\":\"frontend-design\",\"installs\":844328},{\"source\":\"vercel-labs/skills\",\"skillId\":\"find-skills\",\"name\":\"find-skills\",\"installs\":3215790}],\"totalSkills\":9701</script>"#.utf8
+        )
+
+        let results = try SkillDiscoveryService.decodeSkillsShLeaderboard(data, limit: 10)
+
+        XCTAssertEqual(results.map(\.name), ["find-skills", "frontend-design"])
+        XCTAssertEqual(results.map(\.installs), [3_215_790, 844_328])
+        XCTAssertEqual(results[0].repository, "vercel-labs/skills")
+        XCTAssertEqual(results[0].sourceURL, "https://skills.sh/vercel-labs/skills/find-skills")
+    }
+
+    func testSkillsShLeaderboardHonorsLimit() throws {
+        let data = Data(
+            #"\"initialSkills\":[{\"source\":\"owner/repo\",\"skillId\":\"first\",\"name\":\"first\",\"installs\":20},{\"source\":\"owner/repo\",\"skillId\":\"second\",\"name\":\"second\",\"installs\":10}],\"totalSkills\":2"#.utf8
+        )
+
+        XCTAssertEqual(
+            try SkillDiscoveryService.decodeSkillsShLeaderboard(data, limit: 1).map(\.name),
+            ["first"]
+        )
+    }
 }
 
 final class RouterSearchTests: XCTestCase {

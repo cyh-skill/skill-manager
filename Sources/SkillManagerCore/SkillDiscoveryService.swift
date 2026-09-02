@@ -21,6 +21,20 @@ public struct SkillDiscoveryService: Sendable {
         }
     }
 
+    private struct SkillsShLeaderboardSkill: Decodable {
+        var source: String
+        var skillID: String
+        var name: String
+        var installs: Int
+
+        enum CodingKeys: String, CodingKey {
+            case source
+            case skillID = "skillId"
+            case name
+            case installs
+        }
+    }
+
     private struct GitHubSearchItem: Decodable {
         var path: String
         var repository: GitHubSearchRepository
@@ -35,6 +49,40 @@ public struct SkillDiscoveryService: Sendable {
 
     public init(paths: ManagerPaths = ManagerPaths()) {
         github = GitHubService(paths: paths)
+    }
+
+    public func fetchSkillsShLeaderboard(limit: Int = 30) async -> SkillDiscoveryOutcome {
+        guard let url = URL(string: "https://www.skills.sh/") else {
+            return SkillDiscoveryOutcome(errorMessage: CoreL10n.choose(
+                "无法创建 skills.sh 榜单地址。",
+                "Could not create the skills.sh leaderboard URL."
+            ))
+        }
+
+        do {
+            var request = URLRequest(url: url, timeoutInterval: 15)
+            request.setValue("text/html", forHTTPHeaderField: "Accept")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                return SkillDiscoveryOutcome(errorMessage: CoreL10n.choose(
+                    "skills.sh 榜单加载失败（HTTP \(status)）。",
+                    "skills.sh leaderboard failed to load (HTTP \(status))."
+                ))
+            }
+            let results = try Self.decodeSkillsShLeaderboard(data, limit: limit)
+            guard !results.isEmpty else {
+                return SkillDiscoveryOutcome(errorMessage: CoreL10n.choose(
+                    "skills.sh 榜单暂时没有可用结果。",
+                    "The skills.sh leaderboard has no available results."
+                ))
+            }
+            return SkillDiscoveryOutcome(results: results)
+        } catch is CancellationError {
+            return SkillDiscoveryOutcome()
+        } catch {
+            return SkillDiscoveryOutcome(errorMessage: error.localizedDescription)
+        }
     }
 
     public func searchSkillsSh(_ query: String, limit: Int = 20) async -> SkillDiscoveryOutcome {
@@ -108,6 +156,45 @@ public struct SkillDiscoveryService: Sendable {
                 installs: skill.installs
             )
         }
+    }
+
+    static func decodeSkillsShLeaderboard(_ data: Data, limit: Int) throws -> [DiscoveredSkill] {
+        guard limit > 0, let html = String(data: data, encoding: .utf8) else { return [] }
+        let startMarker = #"\"initialSkills\":["#
+        let endMarker = #"],\"totalSkills\":"#
+        guard let markerRange = html.range(of: startMarker),
+              let endRange = html.range(of: endMarker, range: markerRange.upperBound ..< html.endIndex) else {
+            throw DecodingError.dataCorrupted(.init(
+                codingPath: [],
+                debugDescription: "skills.sh leaderboard payload was not found"
+            ))
+        }
+
+        let escapedArray = "[" + String(html[markerRange.upperBound ..< endRange.lowerBound]) + "]"
+        let encodedString = Data(("\"" + escapedArray + "\"").utf8)
+        let leaderboardJSON = try JSONDecoder().decode(String.self, from: encodedString)
+        let skills = try JSONDecoder().decode(
+            [SkillsShLeaderboardSkill].self,
+            from: Data(leaderboardJSON.utf8)
+        )
+        var seen = Set<String>()
+        return skills.compactMap { skill in
+            guard let repository = try? GitHubLocation.parse(skill.source).fullName else { return nil }
+            let name = skill.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let skillID = skill.skillID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, !skillID.isEmpty else { return nil }
+            let identity = "\(repository.lowercased())#\(skillID.lowercased())"
+            guard seen.insert(identity).inserted else { return nil }
+            return DiscoveredSkill(
+                id: "skills.sh:\(repository)/\(skillID)",
+                name: name,
+                repository: repository,
+                repositoryPath: nil,
+                sourceURL: "https://skills.sh/\(repository)/\(skillID)",
+                discoverySource: .skillsSh,
+                installs: skill.installs
+            )
+        }.prefix(limit).map { $0 }
     }
 
     static func decodeGitHub(_ data: Data) throws -> [DiscoveredSkill] {

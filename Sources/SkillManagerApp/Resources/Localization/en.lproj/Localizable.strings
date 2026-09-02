@@ -4,6 +4,7 @@
 "CLI 管理" = "CLI Management";
 "操作记录" = "Activity";
 "设置" = "Settings";
+"Skill 市场" = "Skill Market";
 "刷新" = "Refresh";
 "好" = "OK";
 "打开" = "Open";
@@ -62,6 +63,16 @@
 "从 GitHub 导入为 Lazy" = "Import from GitHub as Lazy";
 "从 GitHub 导入并直装" = "Import from GitHub and Install";
 "在线发现" = "Online Discovery";
+"发现热门 Skill，并通过 GitHub 安装到统一托管库" = "Discover popular Skills and install them into the managed library through GitHub";
+"搜索 Skill、用途或 GitHub 仓库" = "Search Skills, use cases, or GitHub repositories";
+"再输入一个字符即可搜索；当前继续显示排行榜。" = "Enter one more character to search. The leaderboard remains visible for now.";
+"安装排行榜" = "Install Leaderboard";
+"刷新榜单" = "Refresh Leaderboard";
+"进入市场时加载 skills.sh 总榜，并按累计安装量排序；选择后仍由 GitHub CLI 完成安装。" = "Loads the skills.sh all-time leaderboard when the market opens and sorts by total installs. Installation still uses GitHub CLI.";
+"正在加载排行榜…" = "Loading leaderboard…";
+"排行榜暂时不可用" = "Leaderboard Unavailable";
+"重试" = "Retry";
+"搜索结果" = "Search Results";
 "正在搜索…" = "Searching…";
 "两路结果仅用于发现；选择后始终通过 GitHub 仓库安装。" = "Both sources are used only for discovery; installation always comes from GitHub.";
 "已在库中" = "Already in Library";
@@ -107,6 +118,10 @@
 "导入或迁移 Skill 后会显示在这里。" = "Imports and migrations will appear here.";
 
 "本地目录、GitHub 登录态与初始化迁移" = "Local directories, GitHub authentication, and migration setup";
+"版本信息" = "Version Information";
+"版本" = "Version";
+"源码提交" = "Source Revision";
+"开发构建" = "Development Build";
 "已连接" = "Connected";
 "未连接" = "Not Connected";
 "未返回状态信息" = "No status information returned";

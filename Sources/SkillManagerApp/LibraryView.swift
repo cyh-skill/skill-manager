@@ -27,8 +27,6 @@ struct LibraryView: View {
     @State private var filter: LibraryFilter = .all
     @State private var pendingRemoval: ManagedSkill?
     @State private var pendingUnmanagedRemoval: DetectedSkill?
-    @State private var pendingDiscovery: DiscoveredSkill?
-    @State private var discoveryInstallMode: InstallMode = .lazy
 
     private var normalizedQuery: String {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -106,10 +104,6 @@ struct LibraryView: View {
                     }
                 }
 
-                if normalizedQuery.count >= 2 {
-                    discoverySection
-                }
-
                 if !model.unmanagedSkills.isEmpty && filter == .all {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
@@ -155,20 +149,6 @@ struct LibraryView: View {
             .padding(28)
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .task(id: normalizedQuery) {
-            model.prepareSkillSearch(normalizedQuery)
-            guard normalizedQuery.count >= 2 else { return }
-            do {
-                try await Task.sleep(nanoseconds: 350_000_000)
-            } catch {
-                return
-            }
-            guard !Task.isCancelled else { return }
-            await model.searchSkills(normalizedQuery)
-        }
-        .onDisappear {
-            model.clearSkillSearch()
-        }
         .sheet(isPresented: $showImportSheet) {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 5) {
@@ -224,62 +204,6 @@ struct LibraryView: View {
             .padding(26)
             .frame(width: 520)
         }
-        .sheet(item: $pendingDiscovery) { result in
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(L10n.string("通过 GitHub 安装 %@", result.name))
-                        .font(.title2.weight(.semibold))
-                    Text(L10n.string(
-                        "搜索结果来自 %@，安装时只使用已认证的 GitHub CLI 克隆仓库。",
-                        result.discoverySource.displayName
-                    ))
-                        .foregroundStyle(.secondary)
-                }
-
-                VStack(alignment: .leading, spacing: 7) {
-                    Text("GitHub 来源")
-                        .font(.headline)
-                    Text(result.repository)
-                        .font(.body.monospaced())
-                    if let path = result.repositoryPath, !path.isEmpty {
-                        Text(path)
-                            .font(.caption.monospaced())
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("加载方式")
-                        .font(.headline)
-                    Picker("加载方式", selection: $discoveryInstallMode) {
-                        Text("Lazy").tag(InstallMode.lazy)
-                        Text("托管直装").tag(InstallMode.managedDirect)
-                    }
-                    .pickerStyle(.segmented)
-                    Text(L10n.string(discoveryInstallMode == .lazy
-                         ? "仅进入 Router 冷库，不增加 Agent 初始上下文。"
-                         : "统一软链接到 Codex 与 Claude Code 的 Skill 目录。"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Spacer()
-                    Button("取消", role: .cancel) {
-                        pendingDiscovery = nil
-                        discoveryInstallMode = .lazy
-                    }
-                    Button(L10n.string(discoveryInstallMode == .lazy ? "从 GitHub 导入为 Lazy" : "从 GitHub 导入并直装")) {
-                        model.importDiscoveredSkill(result, mode: discoveryInstallMode)
-                        pendingDiscovery = nil
-                        discoveryInstallMode = .lazy
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-            .padding(26)
-            .frame(width: 560)
-        }
         .confirmationDialog(
             "移出 Skill Manager？",
             isPresented: Binding(
@@ -334,166 +258,6 @@ struct LibraryView: View {
         showImportSheet = false
         repositoryURL = ""
         importMode = .lazy
-    }
-
-    private var discoverySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("在线发现")
-                    .font(.title3.weight(.semibold))
-                Text("skills.sh + GitHub")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.quaternary, in: Capsule())
-                Spacer()
-                if model.isSearchingSkills {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("正在搜索…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Text("两路结果仅用于发现；选择后始终通过 GitHub 仓库安装。")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            discoveryProviderSection(
-                title: "skills.sh",
-                symbol: "sparkle.magnifyingglass",
-                results: model.skillsShResults,
-                errorMessage: model.skillsShSearchError
-            )
-            discoveryProviderSection(
-                title: "GitHub",
-                symbol: "chevron.left.forwardslash.chevron.right",
-                results: model.githubResults,
-                errorMessage: model.githubSearchError
-            )
-        }
-        .padding(.top, 8)
-    }
-
-    @ViewBuilder
-    private func discoveryProviderSection(
-        title: String,
-        symbol: String,
-        results: [DiscoveredSkill],
-        errorMessage: String?
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 7) {
-                Image(systemName: symbol)
-                Text(title)
-                    .font(.headline)
-                if !results.isEmpty {
-                    Text(results.count, format: .number)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-                    .padding(.vertical, 6)
-            } else if results.isEmpty && !model.isSearchingSkills {
-                Text("没有匹配结果")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 6)
-            } else {
-                ForEach(results) { result in
-                    discoveredSkillRow(result)
-                }
-            }
-        }
-    }
-
-    private func discoveredSkillRow(_ result: DiscoveredSkill) -> some View {
-        let installed = isManaged(result)
-        return Panel {
-            HStack(alignment: .top, spacing: 13) {
-                Image(systemName: result.discoverySource == .skillsSh ? "sparkles" : "chevron.left.forwardslash.chevron.right")
-                    .font(.title3)
-                    .foregroundStyle(result.discoverySource == .skillsSh ? Color.purple : Color.blue)
-                    .frame(width: 38, height: 38)
-                    .background(
-                        (result.discoverySource == .skillsSh ? Color.purple : Color.blue).opacity(0.1),
-                        in: RoundedRectangle(cornerRadius: 10)
-                    )
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack(spacing: 7) {
-                        Text(result.name)
-                            .font(.headline)
-                        Text(result.discoverySource.displayName)
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.quaternary, in: Capsule())
-                        if installed {
-                            Label("已在库中", systemImage: "checkmark.circle.fill")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(.green)
-                        }
-                    }
-                    if !result.description.isEmpty {
-                        Text(result.description)
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
-                    }
-                    HStack(spacing: 7) {
-                        Text(result.repository)
-                        if let path = result.repositoryPath, !path.isEmpty {
-                            Text("·")
-                            Text(path)
-                        }
-                        if let installs = result.installs {
-                            Text("·")
-                            Text(L10n.string("%@ 次安装", installs.formatted()))
-                        }
-                    }
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.tertiary)
-                }
-                Spacer(minLength: 14)
-                Button {
-                    model.openURL(result.sourceURL)
-                } label: {
-                    Image(systemName: "arrow.up.right.square")
-                }
-                .buttonStyle(.borderless)
-                .help("打开搜索来源")
-                Button {
-                    discoveryInstallMode = .lazy
-                    pendingDiscovery = result
-                } label: {
-                    Label(
-                        L10n.string(installed ? "已导入" : "从 GitHub 导入"),
-                        systemImage: installed ? "checkmark" : "arrow.down.to.line"
-                    )
-                }
-                .buttonStyle(.bordered)
-                .disabled(installed || model.isBusy)
-            }
-        }
-    }
-
-    private func isManaged(_ result: DiscoveredSkill) -> Bool {
-        model.managedSkills.contains { skill in
-            guard skill.repository.caseInsensitiveCompare(result.repository) == .orderedSame else { return false }
-            if let path = result.repositoryPath, !path.isEmpty {
-                return skill.repositoryPath.caseInsensitiveCompare(path) == .orderedSame
-            }
-            return skill.name.caseInsensitiveCompare(result.name) == .orderedSame
-                || (skill.repositoryPath as NSString).lastPathComponent.caseInsensitiveCompare(result.name) == .orderedSame
-        }
     }
 
     private func skillRow(_ skill: ManagedSkill) -> some View {

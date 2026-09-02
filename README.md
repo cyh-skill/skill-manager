@@ -47,7 +47,7 @@ Skill Manager 内置并管理一个可编辑的 `skill-router`。Router 通过 c
 ## 功能
 
 - 从明确的 GitHub URL 导入仓库中的全部有效 `SKILL.md`，并在弹窗中选择 Lazy 或托管直装
-- 进入 Skill 库并输入搜索词后并行查询 skills.sh 与 GitHub，两路结果都只通过已认证的 `gh` 从 GitHub 安装
+- 独立的“Skill 市场”进入后加载 skills.sh 安装排行榜，并可并行搜索 skills.sh 与 GitHub；所有结果都只通过已认证的 `gh` 从 GitHub 安装
 - 默认优先展示 Codex，并扫描当前 `~/.agents/skills` 与旧版 `~/.codex/skills`；同时兼容 Claude Code `~/.claude/skills`
 - 首次启动迁移向导：迁移时每个历史 Skill 必须进入主 Skill 或 Router；向导可随时关闭并稍后重开
 - 迁移前自动备份；整批任意一步失败时恢复原目录，避免半迁移状态
@@ -58,6 +58,7 @@ Skill Manager 内置并管理一个可编辑的 `skill-router`。Router 通过 c
 - 使用 Disabled 分组集中查看停用项；停用项不进入 Router，也不会加载到 Codex 或 Claude Code
 - 编辑内置 Router、查看 CLI 加载状态和操作记录
 - 复用现有 `gh auth` 登录态，不额外保存 GitHub Token
+- 在设置页显示应用版本、Build 与构建对应的源码提交
 
 ## 初始化迁移
 
