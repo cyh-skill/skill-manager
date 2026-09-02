@@ -19,6 +19,7 @@ cp "$bin_dir/SkillManager" "$app_dir/Contents/MacOS/SkillManager"
 cp "$bin_dir/skill-manager-cli" "$app_dir/Contents/Resources/skill-manager-cli"
 cp "$project_dir/Resources/Info.plist" "$app_dir/Contents/Info.plist"
 cp "$project_dir/Resources/AppIcon.icns" "$app_dir/Contents/Resources/AppIcon.icns"
+cp "$project_dir/LICENSE" "$app_dir/Contents/Resources/LICENSE"
 mkdir -p "$app_dir/Contents/Resources/skill-router"
 cp "$project_dir/Sources/SkillManagerApp/Resources/skill-router/SKILL.md" "$app_dir/Contents/Resources/skill-router/SKILL.md"
 for localization in zh-Hans en; do
@@ -34,6 +35,7 @@ chmod 755 "$app_dir/Contents/MacOS/SkillManager" "$app_dir/Contents/Resources/sk
 codesign --force --deep --sign - "$app_dir"
 
 test -f "$app_dir/Contents/Resources/skill-router/SKILL.md"
+test -f "$app_dir/Contents/Resources/LICENSE"
 test -f "$app_dir/Contents/Resources/zh-Hans.lproj/Localizable.strings"
 test -f "$app_dir/Contents/Resources/en.lproj/Localizable.strings"
 

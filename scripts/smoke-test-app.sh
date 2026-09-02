@@ -21,6 +21,7 @@ if [ ! -x "$app_dir/Contents/MacOS/SkillManager" ]; then
     exit 1
 fi
 for required_resource in \
+    "$app_dir/Contents/Resources/LICENSE" \
     "$app_dir/Contents/Resources/skill-router/SKILL.md" \
     "$app_dir/Contents/Resources/zh-Hans.lproj/Localizable.strings" \
     "$app_dir/Contents/Resources/en.lproj/Localizable.strings"; do
@@ -29,6 +30,15 @@ for required_resource in \
         exit 1
     fi
 done
+if ! cmp -s "$project_dir/LICENSE" "$app_dir/Contents/Resources/LICENSE"; then
+    echo "Packaged LICENSE does not match the repository LICENSE" >&2
+    exit 1
+fi
+bundle_copyright="$(/usr/libexec/PlistBuddy -c 'Print :NSHumanReadableCopyright' "$app_dir/Contents/Info.plist")"
+if [ "$bundle_copyright" != "Copyright © 2026 cyh-skill" ]; then
+    echo "Unexpected bundle copyright: $bundle_copyright" >&2
+    exit 1
+fi
 
 SKILL_MANAGER_HOME="$smoke_root/manager" \
 SKILL_MANAGER_CODEX_SKILLS_DIR="$smoke_root/codex-skills" \

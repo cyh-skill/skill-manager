@@ -122,3 +122,7 @@ open "$release_dir"/Skill-Manager-*.dmg
 ```
 
 测试或预览时可以设置 `SKILL_MANAGER_HOME`、`SKILL_MANAGER_CODEX_SKILLS_DIR` 与 `SKILL_MANAGER_CLAUDE_SKILLS_DIR`，让应用使用隔离目录，避免读取或修改真实环境。
+
+## License
+
+本项目基于 [MIT License](LICENSE) 开源。Copyright (c) 2026 cyh-skill。
