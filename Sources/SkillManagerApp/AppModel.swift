@@ -77,12 +77,13 @@ final class AppModel {
     var skillsShSearchError: String?
     var githubSearchError: String?
     var isSearchingSkills = false
-    var updatingRepositoryKey: String?
+    var updatingRepositoryKeys: Set<String> = []
     var isCheckingForUpdates = false
     var isBusy = false
     var busyMessage = ""
     var showOnboarding = false
     var notice: AppNotice?
+    private var workspaceReloadGeneration = 0
 
     init(paths: ManagerPaths = ManagerPaths()) {
         self.paths = paths
@@ -100,7 +101,7 @@ final class AppModel {
     var unmanagedSkills: [DetectedSkill] { snapshot.detectedSkills.filter { $0.kind == .unmanagedDirect } }
     var unmanagedSkillCount: Int { Set(unmanagedSkills.map(\.resolvedPath)).count }
     var managedStateIssueCount: Int { snapshot.managedStateIssues.count }
-    var hasBackgroundGitOperation: Bool { updatingRepositoryKey != nil || isCheckingForUpdates }
+    var hasBackgroundGitOperation: Bool { !updatingRepositoryKeys.isEmpty || isCheckingForUpdates }
 
     func refresh() {
         Task { await reloadWorkspace() }
@@ -233,10 +234,10 @@ final class AppModel {
 
     func updateRepository(for skill: ManagedSkill) {
         let key = skill.repository.lowercased()
-        guard !hasBackgroundGitOperation else { return }
-        updatingRepositoryKey = key
+        guard !isBusy, !isCheckingForUpdates, !updatingRepositoryKeys.contains(key) else { return }
+        updatingRepositoryKeys.insert(key)
         Task {
-            defer { updatingRepositoryKey = nil }
+            defer { updatingRepositoryKeys.remove(key) }
             do {
                 try await Task.detached { [service] in
                     try service.updateRepository(for: skill.id)
@@ -303,7 +304,7 @@ final class AppModel {
     }
 
     func isUpdating(_ skill: ManagedSkill) -> Bool {
-        updatingRepositoryKey == skill.repository.lowercased()
+        updatingRepositoryKeys.contains(skill.repository.lowercased())
     }
 
     func setSkill(_ skill: ManagedSkill, tool: ToolID, enabled: Bool) {
@@ -470,16 +471,22 @@ final class AppModel {
     }
 
     private func reloadWorkspace(showBusy: Bool = true) async {
+        workspaceReloadGeneration += 1
+        let reloadGeneration = workspaceReloadGeneration
         if showBusy {
             isBusy = true
             busyMessage = localized("正在刷新本地状态…")
         }
         do {
             let updated = try await Task.detached { [service] in try service.snapshot() }.value
-            snapshot = updated
-            routerContent = (try? service.routerContent()) ?? routerContent
+            if reloadGeneration == workspaceReloadGeneration {
+                snapshot = updated
+                routerContent = (try? service.routerContent()) ?? routerContent
+            }
         } catch {
-            notice = AppNotice(title: localized("刷新失败"), message: error.localizedDescription)
+            if reloadGeneration == workspaceReloadGeneration {
+                notice = AppNotice(title: localized("刷新失败"), message: error.localizedDescription)
+            }
         }
         if showBusy {
             isBusy = false

@@ -1,6 +1,8 @@
 import Foundation
 
 public struct CatalogStore: Sendable {
+    private static let accessLock = NSRecursiveLock()
+
     public let paths: ManagerPaths
 
     public init(paths: ManagerPaths = ManagerPaths()) {
@@ -17,6 +19,28 @@ public struct CatalogStore: Sendable {
     }
 
     public func load() throws -> SkillCatalog {
+        Self.accessLock.lock()
+        defer { Self.accessLock.unlock() }
+        return try loadUnlocked()
+    }
+
+    public func save(_ catalog: SkillCatalog) throws {
+        Self.accessLock.lock()
+        defer { Self.accessLock.unlock() }
+        try saveUnlocked(catalog)
+    }
+
+    @discardableResult
+    func update<T>(_ operation: (inout SkillCatalog) throws -> T) throws -> T {
+        Self.accessLock.lock()
+        defer { Self.accessLock.unlock() }
+        var catalog = try loadUnlocked()
+        let result = try operation(&catalog)
+        try saveUnlocked(catalog)
+        return result
+    }
+
+    private func loadUnlocked() throws -> SkillCatalog {
         try ensureLayout()
         guard FileManager.default.fileExists(atPath: paths.catalog.path) else {
             return SkillCatalog()
@@ -27,7 +51,7 @@ public struct CatalogStore: Sendable {
         return try decoder.decode(SkillCatalog.self, from: data)
     }
 
-    public func save(_ catalog: SkillCatalog) throws {
+    private func saveUnlocked(_ catalog: SkillCatalog) throws {
         try ensureLayout()
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

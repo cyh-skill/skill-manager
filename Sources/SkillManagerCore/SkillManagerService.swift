@@ -376,39 +376,45 @@ public struct SkillManagerService: Sendable {
     }
 
     public func updateRepository(for skillID: UUID) throws {
-        var catalog = try store.load()
-        guard let selected = catalog.skills.first(where: { $0.id == skillID }) else {
+        let initialCatalog = try store.load()
+        guard let selected = initialCatalog.skills.first(where: { $0.id == skillID }) else {
             throw SkillManagerServiceError.skillNotFound
         }
         let candidates = try github.updateRepository(selected.repository)
         let candidatesByPath = Dictionary(uniqueKeysWithValues: candidates.map { ($0.repositoryPath.lowercased(), $0) })
-        var updatedCount = 0
-        for index in catalog.skills.indices where catalog.skills[index].repository.caseInsensitiveCompare(selected.repository) == .orderedSame {
-            guard let candidate = candidatesByPath[catalog.skills[index].repositoryPath.lowercased()] else { continue }
-            catalog.skills[index].description = candidate.description
-            catalog.skills[index].sourceURL = candidate.sourceURL
-            catalog.skills[index].localPath = candidate.localPath
-            catalog.skills[index].revision = candidate.revision
-            catalog.skills[index].revisionDate = candidate.revisionDate
-            catalog.skills[index].updatedAt = Date()
-            catalog.skills[index].lastCheckedAt = Date()
-            catalog.skills[index].checkedRevision = candidate.revision
-            catalog.skills[index].checkedRevisionDate = candidate.revisionDate
-            catalog.skills[index].updateCheckError = nil
-            updatedCount += 1
+        try store.update { catalog in
+            guard catalog.skills.contains(where: {
+                $0.repository.caseInsensitiveCompare(selected.repository) == .orderedSame
+            }) else {
+                throw SkillManagerServiceError.skillNotFound
+            }
+            var updatedCount = 0
+            for index in catalog.skills.indices where catalog.skills[index].repository.caseInsensitiveCompare(selected.repository) == .orderedSame {
+                guard let candidate = candidatesByPath[catalog.skills[index].repositoryPath.lowercased()] else { continue }
+                catalog.skills[index].description = candidate.description
+                catalog.skills[index].sourceURL = candidate.sourceURL
+                catalog.skills[index].localPath = candidate.localPath
+                catalog.skills[index].revision = candidate.revision
+                catalog.skills[index].revisionDate = candidate.revisionDate
+                catalog.skills[index].updatedAt = Date()
+                catalog.skills[index].lastCheckedAt = Date()
+                catalog.skills[index].checkedRevision = candidate.revision
+                catalog.skills[index].checkedRevisionDate = candidate.revisionDate
+                catalog.skills[index].updateCheckError = nil
+                updatedCount += 1
+            }
+            store.addingActivity(
+                ActivityEvent(
+                    kind: .updated,
+                    title: CoreL10n.choose("更新 GitHub 仓库", "Updated GitHub Repository"),
+                    detail: CoreL10n.choose(
+                        "\(selected.repository) · \(updatedCount) 个 Skill",
+                        "\(selected.repository) · \(updatedCount) Skills"
+                    )
+                ),
+                to: &catalog
+            )
         }
-        store.addingActivity(
-            ActivityEvent(
-                kind: .updated,
-                title: CoreL10n.choose("更新 GitHub 仓库", "Updated GitHub Repository"),
-                detail: CoreL10n.choose(
-                    "\(selected.repository) · \(updatedCount) 个 Skill",
-                    "\(selected.repository) · \(updatedCount) Skills"
-                )
-            ),
-            to: &catalog
-        )
-        try store.save(catalog)
     }
 
     public func checkForRepositoryUpdates() throws -> [RepositoryUpdateCheck] {

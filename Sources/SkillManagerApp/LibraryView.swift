@@ -580,7 +580,7 @@ struct LibraryView: View {
                     } label: {
                         Label("从 GitHub 更新", systemImage: "arrow.triangle.2.circlepath")
                     }
-                    .disabled(model.isBusy || model.hasBackgroundGitOperation)
+                    .disabled(model.isBusy || model.isCheckingForUpdates || model.isUpdating(skill))
                     Button {
                         model.openURL(skill.sourceURL)
                     } label: {
@@ -618,7 +618,7 @@ struct LibraryView: View {
                 updateBadgeLabel(check)
             }
             .buttonStyle(.plain)
-            .disabled(model.isBusy || model.hasBackgroundGitOperation)
+            .disabled(model.isBusy || model.isCheckingForUpdates || model.isUpdating(skill))
             .help(L10n.string("点击更新 %@", check.repository))
         } else {
             updateBadgeLabel(check)

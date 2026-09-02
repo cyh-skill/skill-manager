@@ -296,6 +296,28 @@ final class SkillManagerServiceTests: XCTestCase {
         }
     }
 
+    func testConcurrentCatalogUpdatesPreserveEveryMutation() async throws {
+        let store = service.store
+        let updateCount = 20
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0..<updateCount {
+                group.addTask {
+                    try store.update { catalog in
+                        usleep(1_000)
+                        catalog.activities.append(
+                            ActivityEvent(kind: .updated, title: "update-\(index)", detail: "")
+                        )
+                    }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        let titles = Set(try store.load().activities.map(\.title))
+        XCTAssertEqual(titles, Set((0..<updateCount).map { "update-\($0)" }))
+    }
+
     func testManagedDirectLinkLifecycle() throws {
         let skillRoot = paths.sources.appendingPathComponent("owner/repo/sample", isDirectory: true)
         try FileManager.default.createDirectory(at: skillRoot, withIntermediateDirectories: true)
